@@ -9,8 +9,8 @@ http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mu
 http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
 http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd">
 	<flow name="create_records-Flow" doc:id="800d4204-754d-45a7-a864-fcc33b4c4c1f" >
-		<http:listener doc:name="Listener" doc:id="6471259b-5c6d-4963-89cd-f7b58c86d710" config-ref="HTTP_Listener_config" path="/records" allowedMethods="POST"/>
-		<ee:transform doc:name="Transform Message" doc:id="b4579234-9855-4d1f-98c0-1da58ad77da3" >
+		<http:listener doc:name="POST /records" doc:id="6471259b-5c6d-4963-89cd-f7b58c86d710" config-ref="HTTP_Listener_config" path="/records" allowedMethods="POST"/>
+		<ee:transform doc:name="JSON-to-Records" doc:id="b4579234-9855-4d1f-98c0-1da58ad77da3" >
 			<ee:message >
 				<ee:set-payload ><![CDATA[%dw 2.0
 output application/java
@@ -23,7 +23,7 @@ payload map ( payload01 , indexOfPayload01 ) -> {
 			</ee:message>
 		</ee:transform>
 		<salesforce:create doc:name="Create" doc:id="4ad2ec60-8bea-4b77-a077-9eba7a9a772c" config-ref="Salesforce_Config" type="Contact"/>
-		<ee:transform doc:name="Transform Message" doc:id="329d043d-58c7-41b1-8480-fb4dda9e2f97" >
+		<ee:transform doc:name="Reccords-to-JSON" doc:id="329d043d-58c7-41b1-8480-fb4dda9e2f97" >
 			<ee:message >
 				<ee:set-payload ><![CDATA[%dw 2.0
 output application/json
