@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:os="http://www.mulesoft.org/schema/mule/os"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd">
+	<flow name="create_records-Flow" doc:id="800d4204-754d-45a7-a864-fcc33b4c4c1f" >
+		<http:listener doc:name="Listener" doc:id="6471259b-5c6d-4963-89cd-f7b58c86d710" config-ref="HTTP_Listener_config" path="/records" allowedMethods="POST"/>
+		<ee:transform doc:name="Transform Message" doc:id="b4579234-9855-4d1f-98c0-1da58ad77da3" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload map ( payload01 , indexOfPayload01 ) -> {
+	LastName: payload01.Name,
+	Phone: payload01.Phone,
+	Email: payload01.Email
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<salesforce:create doc:name="Create" doc:id="4ad2ec60-8bea-4b77-a077-9eba7a9a772c" config-ref="Salesforce_Config" type="Contact"/>
+		<ee:transform doc:name="Transform Message" doc:id="329d043d-58c7-41b1-8480-fb4dda9e2f97" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Records created - Logger" doc:id="9633ebd4-89fd-47f5-8453-2ba20df72d27" message='#["Records created? " ++ payload.successful as String]'/>
+		<set-payload value='#["Records created? " ++ payload.successful as String]' doc:name="Was records created?" doc:id="b9701732-d181-4ed4-a2cf-706d4de0f7a4" />
+	</flow>
+	<error-handler name="allErrorHandler" doc:id="38086077-2c04-47e9-aff7-4a2b6d70e088" >
+		<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="62900e22-f447-48e7-8526-598072134a25" type="STREAM_MAXIMUM_SIZE_EXCEEDED" >
+			<set-payload value='#["Error description: " ++ error.description as String ++ " Error type: " ++ error.errorType as String]' doc:name="Set Payload" doc:id="dfae212e-1b82-4dd4-b72f-a9fc45edf221" />
+		</on-error-continue>
+		<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="2ea8b341-4bfd-4f95-9eed-94e5731902e5" type="EXPRESSION" >
+			<set-payload value='"Error in DataWeave Expression"' doc:name="Set Payload" doc:id="418583f9-dd74-45b8-82d6-ccc9e3e9fa1d" />
+		</on-error-continue>
+	</error-handler>
+	<flow name="sync_SF_with_DB-Flow" doc:id="cd5d381e-a451-4b7d-b6ee-17c25978e9bc" >
+		<scheduler doc:name="Scheduler" doc:id="1b6005d4-4333-4d71-aaea-c836494ff30f" >
+			<scheduling-strategy >
+				<fixed-frequency frequency="2" timeUnit="MINUTES"/>
+			</scheduling-strategy>
+		</scheduler>
+		<os:retrieve doc:name="Retrieve" doc:id="569622b4-681a-4e4d-b560-4acd169899e5" key="lastModified" objectStore="sync_sf" target="watermark1" >
+			<os:default-value ><![CDATA[#[|1900-01-01T00:01:01.000Z|]]]></os:default-value>
+		</os:retrieve>
+		<logger level="INFO" doc:name="vars.watermark" doc:id="d6f261e8-cc83-4ade-ae49-d5de4b3be90d" message="#[vars.watermark1]" />
+		<salesforce:query doc:name="Query" doc:id="4825126a-a538-4f85-98c5-0027a8a0751e" config-ref="sf_config">
+			<salesforce:salesforce-query ><![CDATA[SELECT Id, LastModifiedDate, Name, Email, Phone FROM Contact WHERE LastModifiedDate > :watermarkedLMD]]></salesforce:salesforce-query>
+			<salesforce:parameters ><![CDATA[#[{watermarkedLMD: vars.watermark1}]]]></salesforce:parameters>
+		</salesforce:query>
+		<logger level="INFO" doc:name="Payload_JSON" doc:id="32250efc-e781-497b-83c2-4f7029de8712" message="#[%dw 2.0&#10;output application/json&#10;---&#10;payload]" />
+		<os:store doc:name="Store" doc:id="0b452b6a-4d4b-4e69-b210-7328781e3ad9" key="lastModified" failOnNullValue="false" objectStore="sync_sf" >
+			<os:value ><![CDATA[#[max(payload map $.LastModifiedDate)]]]></os:value>
+		</os:store>
+		<logger level="INFO" doc:name="Payload" doc:id="9c5ec139-a47f-4622-919d-067043831afa" message="#[payload]" />
+		<choice doc:name="Choice" doc:id="71df56d3-9a1c-4ca8-a57c-90f73601ccef" >
+			<when expression="#[payload.Name[0] != null]" >
+				<ee:transform doc:name="SF-to-JSON" doc:id="9870d00f-05b2-4772-a800-f2b8835787b6" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+"Records": payload]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<file:write doc:id="dd608ea2-3ea9-4fc0-a850-4172bf49074e" config-ref="File_Config" path="#['C:/Arvind/Support/Use-case-2/MockingDB.txt/']" doc:name="Write" mode="APPEND"/>
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="Logger" doc:id="eede779c-672b-4935-891b-cfe8e71c369a" message="No changes were found in Salesforce Contacts" />
+			</otherwise>
+		</choice>
+	</flow>
+	<flow name="sync_DB_with_SF-Flow" doc:id="792a42a8-831c-4e28-85f8-587a456198a8" >
+		<file:listener doc:name="On New or Updated File" doc:id="4a093474-1abf-4036-bbd6-83babffb3e8e" config-ref="File_Config" directory="C:\Arvind\Support\Use-case-2" watermarkMode="MODIFIED_TIMESTAMP" timeBetweenSizeCheck="10" timeBetweenSizeCheckUnit="SECONDS" >
+			<scheduling-strategy >
+				<fixed-frequency />
+			</scheduling-strategy>
+			<file:matcher filenamePattern="*.json" />
+		</file:listener>
+		<ee:transform doc:name="JSON-to-Records" doc:id="0ec05e18-5e1b-4f76-b004-b244b3287e6a">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+payload map ( payload01 , indexOfPayload01 ) -> {
+	LastName: payload01.Name,
+	Phone: payload01.Phone,
+	Email: payload01.Email
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<salesforce:create type="Contact" doc:name="Create" doc:id="06e89e46-1ff3-4036-a4c7-023718629585" config-ref="sf_config" />
+		<ee:transform doc:name="Records-to-JSON" doc:id="9bd54f13-9781-4c8c-989d-456b1043bca7">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Records created?" doc:id="9f668585-a2a7-4a52-85d2-3b0b5ebdee41" message='#["Records created? " ++ payload.successful as String]' />
+		<set-payload value='#["Records created? " ++ payload.successful as String]' doc:name="Records created?" doc:id="76397c6b-ca14-46ea-a8f7-3614aee1d73d" />
+	</flow>
+</mule>

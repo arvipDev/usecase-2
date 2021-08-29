@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:secure-properties="http://www.mulesoft.org/schema/mule/secure-properties"
+	xmlns:os="http://www.mulesoft.org/schema/mule/os"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/secure-properties http://www.mulesoft.org/schema/mule/secure-properties/current/mule-secure-properties.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="95eaf527-d92e-488d-8eff-20dfce2bd1c6" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<salesforce:sfdc-config name="Salesforce_Config" doc:name="Salesforce Config" doc:id="2ee1ebfa-8383-4e8b-8f1c-130f0f8e6cb7" >
+		<salesforce:config-with-oauth-connection >
+			<salesforce:oauth-authorization-code consumerKey="${secure::sf.consumerKey}" consumerSecret="${secure::sf.consumerSecret}" />
+			<salesforce:oauth-callback-config listenerConfig="HTTP_Listener_config" callbackPath="/callback" authorizePath="/authorize" externalCallbackUrl="http://localhost:8081/callback" />
+			<salesforce:oauth-store-config objectStore="auth_token" />
+		</salesforce:config-with-oauth-connection>
+	</salesforce:sfdc-config>
+	<global-property doc:name="Global Property" doc:id="beb7645e-89f9-4c87-80ec-17ed0d36b6d2" name="secure.key" value="UseCase" />
+	<secure-properties:config name="Secure_Properties_Config" doc:name="Secure Properties Config" doc:id="3858e2e2-ef02-49d0-9995-381a7efc6445" file="cred.yaml" key="${secure.key}" >
+		<secure-properties:encrypt algorithm="Blowfish" />
+	</secure-properties:config>
+	<configuration doc:name="Configuration" doc:id="0dd3d707-a2ab-4f15-9fbf-d3033ac6569e" defaultErrorHandler-ref="allErrorHandler" />
+	<os:object-store name="sync_sf" doc:name="Object store" doc:id="c9cffa85-1b83-42ac-915e-e4f511ffd6e3" />
+	<file:config name="File_Config" doc:name="File Config" doc:id="ee0e65d9-592d-4547-881e-2e2db08747e8" >
+		<file:connection workingDir="C:\Arvind\Support\Use-case-2" />
+	</file:config>
+	<salesforce:sfdc-config name="sf_config" doc:name="Salesforce Config" doc:id="3429bd7b-47e6-4ace-8d9f-c00929537842" >
+		<salesforce:basic-connection username="arvind.purushotham@apisero.com" password="Njsse2021!@#" securityToken="Ju5bSbC5XXLXEdfKp26RlX3z" />
+	</salesforce:sfdc-config>
+	<os:object-store name="auth_token" doc:name="Object store" doc:id="b41041a6-7d5a-4d52-bab8-c69b0799c00c" config-ref="ObjectStore_Config"/>
+	<os:config name="ObjectStore_Config" doc:name="ObjectStore Config" doc:id="94cf49b6-208c-41af-a2ef-60afec2741d4" >
+		<os:connection />
+	</os:config>
+</mule>
